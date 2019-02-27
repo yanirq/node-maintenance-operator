@@ -1,0 +1,7 @@
+apiVersion: kubevirt.io/v1alpha3
+kind: NodeMaintenance
+metadata:
+  name: example-nodemaintenance
+spec:
+  # Add fields here
+  size: 3
