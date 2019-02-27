@@ -1,7 +1,6 @@
 apiVersion: kubevirt.io/v1alpha3
 kind: NodeMaintenance
 metadata:
-  name: example-nodemaintenance
+  name: node01
 spec:
-  # Add fields here
-  size: 3
+  reason: "Reason for maintenance : test drain"

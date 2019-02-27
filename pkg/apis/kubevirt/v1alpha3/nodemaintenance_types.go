@@ -8,6 +8,7 @@ import (
 // +k8s:openapi-gen=true
 type NodeMaintenanceSpec struct {
 	Reason string `json:"reason,omitempty"`
+	//TODO -  add specific namespace here ? 
 }
 
 // NodeMaintenanceStatus defines the observed state of NodeMaintenance
