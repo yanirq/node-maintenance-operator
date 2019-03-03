@@ -709,6 +709,12 @@
   revision = "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
 
 [[projects]]
+  name = "k8s.io/kubernetes"
+  packages = ["pkg/kubectl/drain"]
+  revision = "6c7afd1222ebf2cb91567364471d74ac056437b7"
+  version = "v1.14.0-beta.1"
+
+[[projects]]
   name = "sigs.k8s.io/controller-runtime"
   packages = [
     "pkg/cache",
@@ -716,15 +722,25 @@
     "pkg/client",
     "pkg/client/apiutil",
     "pkg/client/config",
+    "pkg/controller",
+    "pkg/event",
+    "pkg/handler",
+    "pkg/internal/controller",
+    "pkg/internal/controller/metrics",
     "pkg/internal/recorder",
     "pkg/leaderelection",
     "pkg/manager",
     "pkg/metrics",
     "pkg/patch",
+    "pkg/predicate",
+    "pkg/reconcile",
     "pkg/recorder",
     "pkg/runtime/inject",
     "pkg/runtime/log",
+    "pkg/runtime/scheme",
     "pkg/runtime/signals",
+    "pkg/source",
+    "pkg/source/internal",
     "pkg/webhook/admission",
     "pkg/webhook/admission/types",
     "pkg/webhook/internal/metrics",
@@ -755,6 +771,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "903667189e43e675727fd3082957bcb0d3f0483c28b378efe4f22e8a2e99d651"
+  inputs-digest = "ba7b3624e4e689edc874d7625e5dcdb28cab926c0ac5a57d4ab9b83ab53385f0"
   solver-name = "gps-cdcl"
   solver-version = 1
