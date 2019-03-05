@@ -73,24 +73,35 @@ func initDrainer(r *ReconcileNodeMaintenance, config *rest.Config) error {
 
 	r.drainer = &drain.Helper{}
 
-	//Continue even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet
-	//r.drainer.Force = false
+	//Continue even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet.
+	//This is required because VirtualMachineInstance pods are not owned by a ReplicaSet or DaemonSet controller.
+	//This means that the drain operation can’t guarantee that the pods being terminated on the target node will get
+	//re-scheduled replacements placed else where in the cluster after the pods are evicted.
+	//KubeVirt has its own controllers which manage the underlying VirtualMachineInstance pods.
+	//Each controller behaves differently to a VirtualMachineInstance being evicted.
+	r.drainer.Force = false
 
 	//Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).
-	//r.drainer.DeleteLocalData = false
-	//Selector (label query) to filter on
-	//r.drainer.Selector = "l"
-	//Label selector to filter pods on the node
-	//r.drainer.PodSelector = "pod-selector"
+	//This is necessary for removing any pod that utilizes an emptyDir volume.
+	//The VirtualMachineInstance Pod does use emptryDir volumes,
+	//however the data in those volumes are ephemeral which means it is safe to delete after termination.
+	r.drainer.DeleteLocalData = true
 
 	//Ignore DaemonSet-managed pods.
+	//This is required because every node running a VirtualMachineInstance will also be running our helper DaemonSet called virt-handler.
+	//This flag indicates that it is safe to proceed with the eviction and to just ignore DaemonSets.
 	r.drainer.IgnoreAllDaemonSets = true
 
 	//Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.
 	r.drainer.GracePeriodSeconds = -1
 
+	// TODO - add logical value or attach from the maintancene CR
 	//The length of time to wait before giving up, zero means infinite
 	r.drainer.Timeout = time.Minute
+
+	// TODO - consider pod selectors (only for VMIs + others ?)
+	//Label selector to filter pods on the node
+	//r.drainer.PodSelector = "kubevirt.io=virt-launcher"
 
 	cs, err := kubernetes.NewForConfig(config)
 	if err != nil {
@@ -161,6 +172,7 @@ func (r *ReconcileNodeMaintenance) Reconcile(request reconcile.Request) (reconci
 		if err := d.drainPods(nodeName); err != nil {
 			return reconcile.Result{}, err
 		}
+		reqLogger.Info(fmt.Sprintf("Eviction operation from Node: %s completed ", nodeName))
 	}
 
 	return reconcile.Result{}, nil
