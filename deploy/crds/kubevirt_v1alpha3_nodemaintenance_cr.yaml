@@ -3,4 +3,4 @@ kind: NodeMaintenance
 metadata:
   name: node02
 spec:
-  reason: "Reason for maintenance : test drain"
+  reason: "Test node maintenance"
