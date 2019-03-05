@@ -3,6 +3,7 @@ package nodemaintenance
 import (
 	"context"
 	"fmt"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -74,19 +75,22 @@ func initDrainer(r *ReconcileNodeMaintenance, config *rest.Config) error {
 
 	//Continue even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet
 	//r.drainer.Force = false
-	//Ignore DaemonSet-managed pods.
-	//r.drainer.IgnoreAllDaemonSets = false
+
 	//Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).
 	//r.drainer.DeleteLocalData = false
-	//The length of time to wait before giving up, zero means infinite
-	//r.drainer.Timeout = int64(10)
 	//Selector (label query) to filter on
 	//r.drainer.Selector = "l"
 	//Label selector to filter pods on the node
 	//r.drainer.PodSelector = "pod-selector"
 
+	//Ignore DaemonSet-managed pods.
+	r.drainer.IgnoreAllDaemonSets = true
+
 	//Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.
 	r.drainer.GracePeriodSeconds = -1
+
+	//The length of time to wait before giving up, zero means infinite
+	r.drainer.Timeout = time.Minute
 
 	cs, err := kubernetes.NewForConfig(config)
 	if err != nil {
@@ -127,7 +131,7 @@ func (r *ReconcileNodeMaintenance) Reconcile(request reconcile.Request) (reconci
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
-			reqLogger.Info(fmt.Sprintf("NodeMaintenance Object: %s Deleted", request.NamespacedName))
+			reqLogger.Info(fmt.Sprintf("NodeMaintenance Object: %s Deleted ", request.NamespacedName))
 			maintanenceMode = false
 		} else {
 			// Error reading the object - requeue the request.
@@ -146,11 +150,18 @@ func (r *ReconcileNodeMaintenance) Reconcile(request reconcile.Request) (reconci
 		return reconcile.Result{}, err
 	}
 
-	if err := r.runCordonOrUncordon(node, maintanenceMode); err != nil {
+	d := NewNodeDrainer(r)
+
+	if err := d.runCordonOrUncordon(node, maintanenceMode); err != nil {
 		return reconcile.Result{}, err
 	}
 
-	reqLogger.Info(fmt.Sprintf("Evict all Pods from Node: %s", nodeName))
+	if maintanenceMode {
+		reqLogger.Info(fmt.Sprintf("Evict all Pods from Node: %s", nodeName))
+		if err := d.drainPods(nodeName); err != nil {
+			return reconcile.Result{}, err
+		}
+	}
 
 	return reconcile.Result{}, nil
 }
@@ -166,25 +177,4 @@ func (r *ReconcileNodeMaintenance) fetchNode(nodeName string) (*corev1.Node, err
 		return nil, err
 	}
 	return node, nil
-}
-
-func (r *ReconcileNodeMaintenance) runCordonOrUncordon(node *corev1.Node, desired bool) error {
-	cordonOrUncordon := "cordon"
-	if !desired {
-		cordonOrUncordon = "un" + cordonOrUncordon
-	}
-
-	log.Info(fmt.Sprintf("%s Node: %s", cordonOrUncordon, node.Name))
-
-	c := drain.NewCordonHelper(node)
-	if updateRequired := c.UpdateIfRequired(desired); updateRequired {
-		err, patchErr := c.PatchOrReplace(r.drainer.Client)
-		if patchErr != nil {
-			log.Error(err, fmt.Sprintf("Unable to %s Node %s \n", cordonOrUncordon, node.Name))
-		}
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
