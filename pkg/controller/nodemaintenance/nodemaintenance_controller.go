@@ -161,15 +161,13 @@ func (r *ReconcileNodeMaintenance) Reconcile(request reconcile.Request) (reconci
 		return reconcile.Result{}, err
 	}
 
-	d := NewNodeDrainer(r)
-
-	if err := d.runCordonOrUncordon(node, maintanenceMode); err != nil {
+	if err := runCordonOrUncordon(r, node, maintanenceMode); err != nil {
 		return reconcile.Result{}, err
 	}
 
 	if maintanenceMode {
 		reqLogger.Info(fmt.Sprintf("Evict all Pods from Node: %s", nodeName))
-		if err := d.drainPods(nodeName); err != nil {
+		if err := drainPods(r, nodeName); err != nil {
 			return reconcile.Result{}, err
 		}
 		reqLogger.Info(fmt.Sprintf("Eviction operation from Node: %s completed ", nodeName))

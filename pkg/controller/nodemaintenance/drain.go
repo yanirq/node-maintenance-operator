@@ -13,18 +13,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/drain"
 )
 
-// NodeDrainer drains a node via kubernetes API
-type NodeDrainer struct {
-	r *ReconcileNodeMaintenance
-}
-
-// NewNodeDrainer returns a NodeDrainer that drains a node via kubernetes API
-func NewNodeDrainer(r *ReconcileNodeMaintenance) *NodeDrainer {
-	d := &NodeDrainer{r: r}
-	return d
-}
-
-func (d *NodeDrainer) runCordonOrUncordon(node *corev1.Node, desired bool) error {
+func runCordonOrUncordon(r *ReconcileNodeMaintenance, node *corev1.Node, desired bool) error {
 	cordonOrUncordon := "cordon"
 	if !desired {
 		cordonOrUncordon = "un" + cordonOrUncordon
@@ -34,7 +23,7 @@ func (d *NodeDrainer) runCordonOrUncordon(node *corev1.Node, desired bool) error
 
 	c := drain.NewCordonHelper(node)
 	if updateRequired := c.UpdateIfRequired(desired); updateRequired {
-		err, patchErr := c.PatchOrReplace(d.r.drainer.Client)
+		err, patchErr := c.PatchOrReplace(r.drainer.Client)
 		if patchErr != nil {
 			log.Error(err, fmt.Sprintf("Unable to %s Node %s \n", cordonOrUncordon, node.Name))
 		}
@@ -45,8 +34,8 @@ func (d *NodeDrainer) runCordonOrUncordon(node *corev1.Node, desired bool) error
 	return nil
 }
 
-func (d *NodeDrainer) drainPods(nodeName string) error {
-	list, errs := d.r.drainer.GetPodsForDeletion(nodeName)
+func drainPods(r *ReconcileNodeMaintenance, nodeName string) error {
+	list, errs := r.drainer.GetPodsForDeletion(nodeName)
 
 	if errs != nil {
 		return utilerrors.NewAggregate(errs)
@@ -56,8 +45,8 @@ func (d *NodeDrainer) drainPods(nodeName string) error {
 		log.Info(fmt.Sprintf("WARNING: %s\n", warnings))
 	}
 
-	if err := d.deleteOrEvictPods(list.Pods()); err != nil {
-		pendingList, newErrs := d.r.drainer.GetPodsForDeletion(nodeName)
+	if err := deleteOrEvictPods(r, list.Pods()); err != nil {
+		pendingList, newErrs := r.drainer.GetPodsForDeletion(nodeName)
 		log.Error(err, fmt.Sprintf("There are pending pods in node %q when an error occurred: \n", nodeName))
 
 		for _, pendingPod := range pendingList.Pods() {
@@ -72,37 +61,37 @@ func (d *NodeDrainer) drainPods(nodeName string) error {
 }
 
 // deleteOrEvictPods deletes or evicts the pods on the api server
-func (d *NodeDrainer) deleteOrEvictPods(pods []corev1.Pod) error {
+func deleteOrEvictPods(r *ReconcileNodeMaintenance, pods []corev1.Pod) error {
 	if len(pods) == 0 {
 		return nil
 	}
 
-	policyGroupVersion, err := drain.CheckEvictionSupport(d.r.drainer.Client)
+	policyGroupVersion, err := drain.CheckEvictionSupport(r.drainer.Client)
 	if err != nil {
 		return err
 	}
 
 	getPodFn := func(namespace, name string) (*corev1.Pod, error) {
-		return d.r.drainer.Client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+		return r.drainer.Client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
 	}
 
 	if len(policyGroupVersion) > 0 {
-		return d.evictPods(pods, policyGroupVersion, getPodFn)
+		return evictPods(r, pods, policyGroupVersion, getPodFn)
 	}
-	return d.deletePods(pods, getPodFn)
+	return deletePods(r, pods, getPodFn)
 
 }
 
-func (d *NodeDrainer) deletePods(pods []corev1.Pod, getPodFn func(namespace, name string) (*corev1.Pod, error)) error {
+func deletePods(r *ReconcileNodeMaintenance, pods []corev1.Pod, getPodFn func(namespace, name string) (*corev1.Pod, error)) error {
 	// 0 timeout means infinite, we use MaxInt64 to represent it.
 	var globalTimeout time.Duration
-	if d.r.drainer.Timeout == 0 {
+	if r.drainer.Timeout == 0 {
 		globalTimeout = time.Duration(math.MaxInt64)
 	} else {
-		globalTimeout = d.r.drainer.Timeout
+		globalTimeout = r.drainer.Timeout
 	}
 	for _, pod := range pods {
-		err := d.r.drainer.DeletePod(pod)
+		err := r.drainer.DeletePod(pod)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
@@ -111,14 +100,14 @@ func (d *NodeDrainer) deletePods(pods []corev1.Pod, getPodFn func(namespace, nam
 	return err
 }
 
-func (d *NodeDrainer) evictPods(pods []corev1.Pod, policyGroupVersion string, getPodFn func(namespace, name string) (*corev1.Pod, error)) error {
+func evictPods(r *ReconcileNodeMaintenance, pods []corev1.Pod, policyGroupVersion string, getPodFn func(namespace, name string) (*corev1.Pod, error)) error {
 	returnCh := make(chan error, 1)
 
 	for _, pod := range pods {
 		go func(pod corev1.Pod, returnCh chan error) {
 			for {
 				log.Info(fmt.Sprintf("evicting pod %q\n", pod.Name))
-				err := d.r.drainer.EvictPod(pod, policyGroupVersion)
+				err := r.drainer.EvictPod(pod, policyGroupVersion)
 				if err == nil {
 					break
 				} else if apierrors.IsNotFound(err) {
@@ -146,10 +135,10 @@ func (d *NodeDrainer) evictPods(pods []corev1.Pod, policyGroupVersion string, ge
 
 	// 0 timeout means infinite, we use MaxInt64 to represent it.
 	var globalTimeout time.Duration
-	if d.r.drainer.Timeout == 0 {
+	if r.drainer.Timeout == 0 {
 		globalTimeout = time.Duration(math.MaxInt64)
 	} else {
-		globalTimeout = d.r.drainer.Timeout
+		globalTimeout = r.drainer.Timeout
 	}
 	globalTimeoutCh := time.After(globalTimeout)
 	numPods := len(pods)
