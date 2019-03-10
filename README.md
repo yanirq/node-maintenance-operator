@@ -15,10 +15,32 @@ $ kubectl create -f deploy/crds/kubevirt_v1alpha3_nodemaintenance_crd.yaml
 
 Once this is done, there are two ways to run the operator:
 
-- As Go program outside a cluster
 - As a Deployment inside a Openshift/Kubernetes cluster
+- As Go program outside a cluster
 
-### 1. Run locally outside the cluster
+### 1. Run as a Deployment inside the cluster
+
+The Deployment manifest is generated at `deploy/operator.yaml`. Be sure to update the deployment image if there are changes as shown [here](https://github.com/operator-framework/operator-sdk/blob/master/doc/user-guide.md#1-run-as-a-deployment-inside-the-cluster).
+
+Setup RBAC and deploy the node-maintenance-operator:
+
+```sh
+$ kubectl create -f deploy/service_account.yaml
+$ kubectl create -f deploy/role.yaml
+$ kubectl create -f deploy/role_binding.yaml
+$ kubectl create -f deploy/operator.yaml
+```
+
+Verify that the node-maintenance-operator is up and running:
+
+```sh
+$ kubectl get deployment
+NAME                     DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+node-maintenance-operator      1         1         1            1           1m
+```
+
+
+### 2. Run locally outside the cluster
 
 This method is preferred during development cycle to deploy and test faster.
 

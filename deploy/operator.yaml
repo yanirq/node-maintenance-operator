@@ -16,7 +16,7 @@ spec:
       containers:
         - name: node-maintenance-operator
           # Replace this with the built image name
-          image: REPLACE_IMAGE
+          image: quay.io/yanirq/node-maintenance-operator:v0.0.1
           command:
           - node-maintenance-operator
           imagePullPolicy: Always
