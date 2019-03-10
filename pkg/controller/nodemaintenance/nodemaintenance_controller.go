@@ -170,7 +170,6 @@ func (r *ReconcileNodeMaintenance) Reconcile(request reconcile.Request) (reconci
 		if err := drainPods(r, nodeName); err != nil {
 			return reconcile.Result{}, err
 		}
-		reqLogger.Info(fmt.Sprintf("Eviction operation from Node: %s completed ", nodeName))
 	}
 
 	return reconcile.Result{}, nil
