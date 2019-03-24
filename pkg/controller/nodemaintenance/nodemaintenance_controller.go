@@ -79,7 +79,7 @@ func initDrainer(r *ReconcileNodeMaintenance, config *rest.Config) error {
 	//re-scheduled replacements placed else where in the cluster after the pods are evicted.
 	//KubeVirt has its own controllers which manage the underlying VirtualMachineInstance pods.
 	//Each controller behaves differently to a VirtualMachineInstance being evicted.
-	r.drainer.Force = false
+	r.drainer.Force = true
 
 	//Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).
 	//This is necessary for removing any pod that utilizes an emptyDir volume.
