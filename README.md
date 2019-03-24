@@ -53,7 +53,7 @@ export OPERATOR_NAME=node-maintenance-operator
 Run the operator locally with the default Kubernetes config file present at `$HOME/.kube/config` or  with specificing kubeconfig via the flag `--kubeconfig=<path/to/kubeconfig>`:
 
 ```sh
-$ operator-sdk up local --kubeconfig="/home/usr/go/src/kubevirt.io/kubevirt/cluster/os-3.11.0/.kubeconfig"
+$ operator-sdk up local --kubeconfig="<path/to/kubeconfig>"
 
 INFO[0000] Running the operator locally.                
 INFO[0000] Using namespace default.                     
@@ -133,15 +133,25 @@ $ kubectl delete -f deploy/crds/cache_v1alpha1_memcached_cr.yaml
 
 ```
 
+## Tests
+
+Running e2e tests:
+
+### Local 
+Run the operator tests locally with the default Kubernetes config file present at `$HOME/.kube/config` or  with specificing kubeconfig via the flag `--kubeconfig=<path/to/kubeconfig>` and a namespace `--namespace=<namespace>`:
+
+
+```sh
+operator-sdk test local ./test/e2e --kubeconfig=<path/to/kubeconfig> --namespace=<namespace>
+```
 
 ## Next Steps
 - Trigger VM migration 
 - Handle unremoved pods and daemonsets
+- Check where should the operator be deployed (infra pods?)
 - Check behavior for storage pods
-- Verify that disruption budget is obeyed during pod eviction
 - Fencing
 - Versioning
-- e2e tests
 - Enhance error handling
 - Operator integration and packaging
 
