@@ -3,6 +3,7 @@ package e2e
 import (
 	goctx "context"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -123,6 +124,10 @@ func nodeMaintenanceTest(t *testing.T, f *framework.Framework, ctx *framework.Te
 		t.Fatal(fmt.Errorf("Node %s should have been unschedulable ", nodeName))
 	}
 
+	if !kubevirtTaintExist(node) {
+		t.Fatal(fmt.Errorf("Node %s should have been tainted with kubevirt.io/drain:NoSchedule", nodeName))
+	}
+
 	nodes := &corev1.NodeList{}
 	computeNodesSelector := labels.SelectorFromSet(computeLabels)
 	err = f.Client.List(goctx.TODO(), &client.ListOptions{LabelSelector: computeNodesSelector}, nodes)
@@ -166,6 +171,10 @@ func nodeMaintenanceTest(t *testing.T, f *framework.Framework, ctx *framework.Te
 
 	if node.Spec.Unschedulable == true {
 		t.Fatal(fmt.Errorf("Node %s should have been schedulable", nodeName))
+	}
+
+	if kubevirtTaintExist(node) {
+		t.Fatal(fmt.Errorf("Node %s kubevirt.io/drain:NoSchedule taint should have been removed", nodeName))
 	}
 
 	// Check that the deployment has 1 replica running after maintenance is removed.
@@ -238,4 +247,18 @@ func getCurrentDeploymentHostName(t *testing.T, f *framework.Framework) (string,
 
 	nodeName := pods.Items[0].Spec.NodeName
 	return nodeName, nil
+}
+
+func kubevirtTaintExist(node *corev1.Node) bool {
+	kubevirtDrainTaint := corev1.Taint{
+		Key:    "kubevirt.io/drain",
+		Effect: corev1.TaintEffectNoSchedule,
+	}
+	taints := node.Spec.Taints
+	for _, taint := range taints {
+		if reflect.DeepEqual(taint, kubevirtDrainTaint) {
+			return true
+		}
+	}
+	return false
 }
