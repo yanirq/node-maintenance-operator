@@ -166,9 +166,24 @@ func (r *ReconcileNodeMaintenance) Reconcile(request reconcile.Request) (reconci
 	}
 
 	if maintanenceMode {
+		updated, err := addTaint(r.client, node)
+		if !updated {
+			reqLogger.Error(err, fmt.Sprintf("kubevirt.io/drain taint was not added to Node: %s", nodeName))
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+		}
 		reqLogger.Info(fmt.Sprintf("Evict all Pods from Node: %s", nodeName))
-		if err := drainPods(r, nodeName); err != nil {
+		if err = drainPods(r, nodeName); err != nil {
 			return reconcile.Result{}, err
+		}
+	} else {
+		updated, err := removeTaint(r.client, node)
+		if !updated {
+			reqLogger.Error(err, fmt.Sprintf("kubevirt.io/drain taint was not removed from Node: %s", nodeName))
+			if err != nil {
+				return reconcile.Result{}, err
+			}
 		}
 	}
 
